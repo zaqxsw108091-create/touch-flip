@@ -1,5 +1,5 @@
 import './styles.css';
-import { CONFIG } from './config';
+import { CONFIG, type GameConfig } from './config';
 import { GameState } from './core/GameState';
 import { NpcPlayer } from './core/NpcPlayer';
 import { addRecord, parseRecords, type MatchRecord } from './core/Records';
@@ -44,7 +44,9 @@ function loadOptions(): MatchOptions {
       merged.roundDurationMs = DEFAULT_OPTIONS.roundDurationMs;
     }
     if (!CONFIG.npc.tiers.some((t) => t.id === merged.npcTier)) merged.npcTier = DEFAULT_OPTIONS.npcTier;
-    if (merged.deviceMode !== 'phone' && merged.deviceMode !== 'tablet') merged.deviceMode = 'tablet';
+    if (merged.deviceMode !== 'phone' && merged.deviceMode !== 'tablet' && merged.deviceMode !== 'computer') {
+      merged.deviceMode = 'tablet';
+    }
     if (merged.opponent !== 'npc' && merged.opponent !== 'local' && merged.opponent !== 'online') merged.opponent = 'local';
     if (typeof merged.serverUrl !== 'string') merged.serverUrl = '';
     return merged;
@@ -154,24 +156,42 @@ const setup = new SetupScreen(root, CONFIG);
 let needsReadyResync = false;
 const heldKeys = new Set<string>();
 
+/**
+ * 기기로 "컴퓨터"를 고르면 마우스도 정식 입력으로 허용한다.
+ *
+ * 원래 마우스는 터치 전용 공정성 때문에 `?debug=mouse` 로만 켜지는 개발자용 우회로였다.
+ * 하지만 터치스크린이 없는 일반 PC/노트북에서도 이 게임을 플레이할 수 있어야 하므로,
+ * "컴퓨터" 기기를 명시적으로 고른 경우에는 이걸 숨겨진 우회로가 아니라 정식 기능으로 켠다.
+ * CONFIG 자체는 건드리지 않고, 이 세션에서만 쓸 얕은 복사본을 만든다.
+ */
+function effectiveConfigFor(options: MatchOptions): GameConfig {
+  if (options.deviceMode !== 'computer') return CONFIG;
+  if (CONFIG.input.ALLOWED_POINTER_TYPES.includes('mouse')) return CONFIG; // ?debug=mouse 등으로 이미 허용됨
+  return {
+    ...CONFIG,
+    input: { ...CONFIG.input, ALLOWED_POINTER_TYPES: [...CONFIG.input.ALLOWED_POINTER_TYPES, 'mouse'] },
+  };
+}
+
 function createSession(options: MatchOptions): Session {
+  const cfg = effectiveConfigFor(options);
   const isNpc = options.opponent === 'npc';
-  const tier = CONFIG.npc.tiers.find((t) => t.id === options.npcTier) ?? CONFIG.npc.tiers[0];
+  const tier = cfg.npc.tiers.find((t) => t.id === options.npcTier) ?? cfg.npc.tiers[0];
   if (isNpc && !tier) throw new Error('NPC 단계가 config 에 하나도 없습니다');
 
-  const zoneMode = isNpc ? CONFIG.npc.NPC_ZONE_MODE : 'split';
+  const zoneMode = isNpc ? cfg.npc.NPC_ZONE_MODE : 'split';
   const names: Record<PlayerId, string> = {
     1: '플레이어 1',
     2: isNpc && tier ? `NPC ${tier.name}` : '플레이어 2',
   };
 
-  const state = new GameState(CONFIG, { roundDurationMs: options.roundDurationMs });
-  const renderer = new Renderer(root, CONFIG, { match: options, names, zoneMode });
+  const state = new GameState(cfg, { roundDurationMs: options.roundDurationMs });
+  const renderer = new Renderer(root, cfg, { match: options, names, zoneMode });
   renderer.mount();
   renderer.setReducedMotion(currentSettings.reducedMotion);
 
-  const geometry = new BoardGeometry(CONFIG, renderer.cardElements, renderer.boardElement, zoneMode, 1);
-  const governor = new InputGovernor(CONFIG, geometry, (tap) => state.applyTap(tap));
+  const geometry = new BoardGeometry(cfg, renderer.cardElements, renderer.boardElement, zoneMode, 1);
+  const governor = new InputGovernor(cfg, geometry, (tap) => state.applyTap(tap));
   const stopObserving = geometry.observe();
   renderer.setLayoutListener(() => geometry.measure());
 
@@ -179,7 +199,7 @@ function createSession(options: MatchOptions): Session {
   governor.attachReadyControl(renderer.readyButton(1), 1, setReady);
   if (!isNpc) governor.attachReadyControl(renderer.readyButton(2), 2, setReady);
 
-  const npc = isNpc && tier ? new NpcPlayer(CONFIG, tier, 2) : null;
+  const npc = isNpc && tier ? new NpcPlayer(cfg, tier, 2) : null;
 
   // ------------------------------------------------------------ 일시정지
   // GameState 는 시간을 스스로 재지 않으므로, 정지 동안 tick()/applyTap() 을 아예
@@ -279,13 +299,14 @@ function createSession(options: MatchOptions): Session {
 
 /** 온라인 세션. GameState 없이 서버 스냅샷만 그린다. 입력은 여전히 InputGovernor 를 거쳐 서버로 간다. */
 function createOnlineSession(options: MatchOptions, remote: RemoteSession): Session {
+  const cfg = effectiveConfigFor(options);
   const me = remote.me ?? 1;
   const other: PlayerId = me === 1 ? 2 : 1;
   const names = { 1: '', 2: '' } as Record<PlayerId, string>;
   names[me] = '나';
   names[other] = '상대';
 
-  const renderer = new Renderer(root, CONFIG, {
+  const renderer = new Renderer(root, cfg, {
     match: options,
     names,
     zoneMode: 'full',
@@ -295,8 +316,8 @@ function createOnlineSession(options: MatchOptions, remote: RemoteSession): Sess
   renderer.mount();
   renderer.setReducedMotion(currentSettings.reducedMotion);
 
-  const geometry = new BoardGeometry(CONFIG, renderer.cardElements, renderer.boardElement, 'full', me);
-  const governor = new InputGovernor(CONFIG, geometry, (tap) => remote.submitTap(tap));
+  const geometry = new BoardGeometry(cfg, renderer.cardElements, renderer.boardElement, 'full', me);
+  const governor = new InputGovernor(cfg, geometry, (tap) => remote.submitTap(tap));
   const stopObserving = geometry.observe();
   renderer.setLayoutListener(() => geometry.measure());
 

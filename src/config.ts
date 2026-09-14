@@ -6,7 +6,7 @@
  */
 
 export type PointerKind = 'touch' | 'mouse' | 'pen';
-export type DeviceMode = 'tablet' | 'phone';
+export type DeviceMode = 'tablet' | 'phone' | 'computer';
 export type ZoneMode = 'split' | 'full';
 
 export interface BoardConfig {
@@ -145,6 +145,9 @@ export const CONFIG: GameConfig = {
   device: {
     tablet: { CARD_PHYSICAL_SIZE_MM: 16, CARD_GAP_MM: 2.4 },
     phone: { CARD_PHYSICAL_SIZE_MM: 13, CARD_GAP_MM: 1.8 },
+    // 마우스는 손가락보다 훨씬 정밀해서 태블릿과 같은 크기로도 충분하다.
+    // 화면 비율이 아니라 물리 크기로 고정하는 원칙은 컴퓨터에서도 그대로 유지한다.
+    computer: { CARD_PHYSICAL_SIZE_MM: 16, CARD_GAP_MM: 2.4 },
   },
   input: {
     MAX_POINTERS_PER_PLAYER: 2,

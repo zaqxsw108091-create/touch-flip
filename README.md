@@ -139,8 +139,8 @@ PWA 매니페스트와 서비스 워커가 포함되어 있어 태블릿 홈화�
 
 싱글플레이(NPC) 대전 화면. `docs/screenshots/` 에 이미지를 넣고 파일명만 아래에 맞추면 표시된다.
 
-![라운드 진행 중](docs/screenshots/gameplay-round.png)
-![매치 결과](docs/screenshots/gameplay-result.png)
+![NPC 대전 화면 1](docs/screenshots/gameplay-npc1.png)
+![NPC 대전 화면 2](docs/screenshots/gameplay-npc2.png)
 
 ## 문서
 

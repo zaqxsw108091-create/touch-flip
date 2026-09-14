@@ -122,7 +122,7 @@ export class SetupScreen {
 
     const crumbs = el('div', 'setup__crumbs');
     const parts: string[] = [];
-    if (this.step !== 'device') parts.push(this.options.deviceMode === 'phone' ? '폰' : '태블릿');
+    if (this.step !== 'device') parts.push(deviceLabel(this.options.deviceMode));
     if (this.step !== 'device' && this.step !== 'mode') {
       parts.push(this.options.opponent === 'npc' ? '싱글플레이' : '멀티플레이');
     }
@@ -187,6 +187,10 @@ export class SetupScreen {
       }),
       this.choice('폰', `카드 ${this.cfg.device.phone.CARD_PHYSICAL_SIZE_MM}mm · 한 손 화면, 싱글·온라인에 적합`, () => {
         this.options.deviceMode = 'phone';
+        this.go('mode');
+      }),
+      this.choice('컴퓨터', `카드 ${this.cfg.device.computer.CARD_PHYSICAL_SIZE_MM}mm · 마우스로 플레이, 터치스크린 없어도 됨`, () => {
+        this.options.deviceMode = 'computer';
         this.go('mode');
       }),
     );
@@ -477,6 +481,17 @@ export class SetupScreen {
 
   get currentStep(): Step {
     return this.step;
+  }
+}
+
+function deviceLabel(mode: MatchOptions['deviceMode']): string {
+  switch (mode) {
+    case 'phone':
+      return '폰';
+    case 'computer':
+      return '컴퓨터';
+    default:
+      return '태블릿';
   }
 }
 
