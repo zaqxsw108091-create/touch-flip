@@ -1,0 +1,47 @@
+name: GitHub Pages 배포
+
+# 클라이언트(정적 사이트)만 배포한다. 싱글플레이(NPC)는 서버가 필요 없으므로
+# 이 배포만으로 과제 제출용 "무로그인 공개 게임" 요구사항을 충족한다.
+# 온라인 멀티는 server/ 를 별도로(예: Render, Railway) 배포해야 동작한다 — 배포 안 해도
+# 싱글플레이/2인 로컬에는 영향 없다.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

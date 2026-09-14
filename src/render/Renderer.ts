@@ -30,6 +30,7 @@ export class Renderer {
   private boardEl!: HTMLElement;
   private overlayEl!: HTMLElement;
   private menuEl!: HTMLButtonElement;
+  private pauseEl!: HTMLButtonElement;
   private bannerEl!: HTMLElement;
   private statsEl: HTMLElement | null = null;
   private readonly cards: HTMLElement[] = [];
@@ -48,6 +49,8 @@ export class Renderer {
   private prevRevision = -1;
   private prevTimerText = '';
   private prevCountdownValue = -1;
+  private prevPaused = false;
+  private reducedMotion = false;
   private boardDirty = true;
   private foulUntil: Record<PlayerId, number> = { 1: 0, 2: 0 };
   private layoutListener: (() => void) | null = null;
@@ -101,6 +104,8 @@ export class Renderer {
     delete this.root.dataset['zone'];
     delete this.root.dataset['phase'];
     delete this.root.dataset['screen'];
+    delete this.root.dataset['paused'];
+    this.prevPaused = false;
   }
 
   setLayoutListener(fn: () => void): void {
@@ -119,6 +124,11 @@ export class Renderer {
     return this.menuEl;
   }
 
+  /** 온라인 모드에는 없다 (서버가 시간의 유일한 권위라 클라이언트 혼자 멈출 수 없다) */
+  get pauseButton(): HTMLButtonElement {
+    return this.pauseEl;
+  }
+
   readyButton(player: PlayerId): HTMLButtonElement {
     return this.readyButtons[player];
   }
@@ -132,7 +142,24 @@ export class Renderer {
 
   // ------------------------------------------------------------ 렌더
 
-  render(snapshot: Snapshot, now: number, stats?: GovernorStats): void {
+  /**
+   * paused 가 true 면 board/HUD/타이머는 호출자가 넘겨준(정지 시점에 얼린) snapshot 을
+   * 그대로 유지하고, 오버레이만 "일시정지" 문구로 덮는다. 실제 게임 상태 자체는
+   * main.ts 가 GameState.tick() 호출을 멈춰서 정지시킨다 — 여기서는 화면만 담당한다.
+   */
+  render(snapshot: Snapshot, now: number, stats?: GovernorStats, paused = false): void {
+    if (paused !== this.prevPaused) {
+      this.prevPaused = paused;
+      this.root.dataset['paused'] = String(paused);
+      this.pauseEl.textContent = paused ? '계속' : '일시정지';
+      this.pauseEl.setAttribute('aria-pressed', String(paused));
+      if (paused) this.setOverlayText('일시정지', '다시 누르면 이어서 진행합니다 (P 또는 버튼)');
+    }
+    if (paused) {
+      if (stats && this.statsEl) this.renderStats(stats);
+      return;
+    }
+
     this.renderTimer(snapshot);
     this.renderFoulFlash(now);
 
@@ -284,7 +311,17 @@ export class Renderer {
     menu.setAttribute('aria-label', '시작 설정으로 돌아가기 (Esc)');
     this.menuEl = menu;
 
-    stage.append(bar, board, overlay, banner, menu);
+    const pause = document.createElement('button');
+    pause.type = 'button';
+    pause.className = 'pause-btn';
+    pause.textContent = '일시정지';
+    pause.setAttribute('aria-pressed', 'false');
+    pause.setAttribute('aria-label', '일시정지 (P)');
+    // 온라인은 서버가 시간의 유일한 권위라 클라이언트 혼자 멈출 방법이 없다
+    pause.hidden = this.opts.match.opponent === 'online';
+    this.pauseEl = pause;
+
+    stage.append(bar, board, overlay, banner, menu, pause);
     this.boardEl = board;
     this.overlayEl = overlay;
     return stage;
@@ -372,16 +409,18 @@ export class Renderer {
     const names = this.opts.names;
     const isNpc = this.opts.match.opponent === 'npc';
     switch (snapshot.phase) {
-      case 'idle':
-        this.setOverlayText(
-          '준비',
-          isNpc
-            ? '준비 버튼을 누르고 있으면 NPC 도 준비합니다 (키보드 F 또는 Space)'
-            : this.opts.match.opponent === 'online'
-              ? '양쪽 기기에서 모두 준비 버튼을 누르고 있으면 시작합니다 (키보드 F)'
-              : '양쪽 모두 준비 버튼을 누르고 있으면 시작합니다 (키보드 F / J, 혼자 테스트는 Space)',
-        );
+      case 'idle': {
+        // 규칙 + 조작 + 시작 방법을 한 화면에서 순서대로 보여준다 (게임 규칙/핵심 조작이
+        // 화면에 드러나야 한다는 요구사항 — 문서를 뒤지지 않고 여기서 다 알 수 있어야 한다)
+        const rule = '카드를 눌러 내 색으로 바꾸세요. 시간 종료 시 더 많이 가진 쪽이 승리합니다.';
+        const start = isNpc
+          ? '준비 버튼을 누르고 있으면 NPC 도 준비합니다 (키보드 F 또는 Space)'
+          : this.opts.match.opponent === 'online'
+            ? '양쪽 기기에서 모두 준비 버튼을 누르고 있으면 시작합니다 (키보드 F)'
+            : '양쪽 모두 준비 버튼을 누르고 있으면 시작합니다 (키보드 F / J, 혼자 테스트는 Space)';
+        this.setOverlayText('준비', `${rule} · ${start}`);
         break;
+      }
       case 'countdown':
         this.setOverlayText(String(snapshot.countdownValue), '보드를 건드리면 부정 출발입니다');
         break;
@@ -433,7 +472,13 @@ export class Renderer {
       `포인터초과 ${r['max-pointers']} · 쿨다운 ${r.cooldown} · 락아웃 ${r['card-lockout']} · 상태거부 ${r.state}`;
   }
 
+  /** 앱 설정(모션 감소) 또는 OS 설정(prefers-reduced-motion) 중 하나라도 켜져 있으면 애니메이션을 끈다 */
+  setReducedMotion(reduced: boolean): void {
+    this.reducedMotion = reduced;
+  }
+
   private playFlip(card: HTMLElement): void {
+    if (this.reducedMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     // Web Animations API — 클래스 토글 + 강제 리플로우 없이 매번 처음부터 재생된다.
     card.animate(
       [

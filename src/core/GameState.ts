@@ -208,6 +208,31 @@ export class GameState {
     return { accepted: true, cardIndex, playerId, owner: playerId, previousOwner };
   }
 
+  /**
+   * 일시정지 구간만큼 진행 중인 마감 시각들을 뒤로 미룬다.
+   *
+   * GameState 는 시간을 스스로 재지 않으므로(시계 없음), "그동안 멈춰 있었다"는
+   * 사실을 호출자가 명시적으로 알려줘야 한다. 호출자(main.ts)는 일시정지 동안
+   * tick()/applyTap() 을 아예 호출하지 않다가, 재개 시 실제 경과한 정지 시간
+   * (deltaMs = 재개 시각 − 정지 시작 시각, 둘 다 같은 시계축)만큼 이 메서드로 보정한다.
+   * 이렇게 하면 탭 판정 시각(event.timeStamp)과 라운드 마감 시각이 항상 같은
+   * 축 위에 남는다 — 별도의 "정지된 시계"를 만들지 않는다.
+   *
+   * 활성 상태가 아닌 마감(0)은 건드리지 않는다. 예를 들어 페널티가 없는데
+   * penaltyUntil 을 밀면 없던 페널티가 생겨버린다.
+   */
+  extendDeadlines(deltaMs: number): void {
+    if (deltaMs <= 0) return;
+    if (this._countdownEndsAt > 0) this._countdownEndsAt += deltaMs;
+    if (this._roundStartAt > 0) this._roundStartAt += deltaMs;
+    if (this._roundEndsAt > 0) this._roundEndsAt += deltaMs;
+    for (const p of [1, 2] as PlayerId[]) {
+      if (this._penaltyUntil[p] > 0) this._penaltyUntil[p] += deltaMs;
+    }
+    // revision 을 올려서, 재개 직후 렌더러가 "일시정지" 문구를 현재 페이즈 문구로 되돌리게 한다
+    this.bump();
+  }
+
   /** 페이즈 전이를 구동한다. 매 프레임 호출해도 되고, 테스트에서 임의 시각으로 호출해도 된다. */
   tick(now: number): void {
     if (this._phase === 'countdown' && now >= this._countdownEndsAt) {

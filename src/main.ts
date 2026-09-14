@@ -3,7 +3,9 @@ import { CONFIG } from './config';
 import { GameState } from './core/GameState';
 import { NpcPlayer } from './core/NpcPlayer';
 import { addRecord, parseRecords, type MatchRecord } from './core/Records';
+import { DEFAULT_SETTINGS, parseSettings, type AppSettings } from './core/Settings';
 import type { MatchOptions, PlayerId } from './core/types';
+import { SoundEffects } from './audio/SoundEffects';
 import { InputGovernor } from './input/InputGovernor';
 import type { RemoteSession } from './net/RemoteSession';
 import { BoardGeometry } from './render/BoardGeometry';
@@ -92,6 +94,37 @@ function recordNpcMatch(npcTier: number, roundDurationMs: number, winner: Player
   saveRecords(addRecord(loadRecords(), record, CONFIG.ui.MAX_RECORDS));
 }
 
+// ---------------------------------------------------------------- 음소거 / 모션 감소
+// loadOptions() 와 같은 방어 패턴: 손상되거나 비어 있어도 항상 기본값으로 시작한다.
+
+function loadSettings(): AppSettings {
+  try {
+    return parseSettings(localStorage.getItem(CONFIG.ui.SETTINGS_STORAGE_KEY));
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function saveSettings(settings: AppSettings): void {
+  try {
+    localStorage.setItem(CONFIG.ui.SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    /* 저장이 안 돼도 게임은 된다 */
+  }
+}
+
+let currentSettings: AppSettings = loadSettings();
+const sound = new SoundEffects();
+sound.setMuted(currentSettings.mute);
+
+/** 설정 화면에서 토글을 누르는 즉시 호출된다 — 저장하고, 지금 실행 중인 세션에도 곧바로 반영한다 */
+function applySettings(next: AppSettings): void {
+  currentSettings = next;
+  saveSettings(next);
+  sound.setMuted(next.mute);
+  session?.renderer.setReducedMotion(next.reducedMotion);
+}
+
 // ---------------------------------------------------------------- 게임 세션
 
 /** 한 판의 조립체. 설정 화면으로 돌아가면 통째로 버리고 다시 만든다. */
@@ -107,6 +140,9 @@ interface Session {
   /** 이 기기에서 조작하는 플레이어 */
   controllable: PlayerId[];
   setReady: (player: PlayerId, held: boolean) => void;
+  /** 온라인은 지원하지 않는다(서버가 시간의 유일한 권위) — 그런 세션은 항상 no-op */
+  setPaused: (paused: boolean, now: number) => void;
+  isPaused: () => boolean;
   step: (now: number) => void;
   destroy: () => void;
 }
@@ -132,6 +168,7 @@ function createSession(options: MatchOptions): Session {
   const state = new GameState(CONFIG, { roundDurationMs: options.roundDurationMs });
   const renderer = new Renderer(root, CONFIG, { match: options, names, zoneMode });
   renderer.mount();
+  renderer.setReducedMotion(currentSettings.reducedMotion);
 
   const geometry = new BoardGeometry(CONFIG, renderer.cardElements, renderer.boardElement, zoneMode, 1);
   const governor = new InputGovernor(CONFIG, geometry, (tap) => state.applyTap(tap));
@@ -144,11 +181,37 @@ function createSession(options: MatchOptions): Session {
 
   const npc = isNpc && tier ? new NpcPlayer(CONFIG, tier, 2) : null;
 
+  // ------------------------------------------------------------ 일시정지
+  // GameState 는 시간을 스스로 재지 않으므로, 정지 동안 tick()/applyTap() 을 아예
+  // 호출하지 않다가 재개 시 실제 정지 시간만큼 extendDeadlines() 로 보정한다.
+  // 화면은 정지 시점의 snapshot 을 그대로 얼려서 보여준다 (renderer 의 paused=true 경로).
+  let paused = false;
+  let pausedAt = 0;
+  let frozenSnapshot: ReturnType<typeof state.snapshot> | null = null;
+
+  const setPaused = (next: boolean, now: number): void => {
+    if (next === paused) return;
+    if (next && state.phase !== 'countdown' && state.phase !== 'playing') return; // 멈출 게 없다
+    paused = next;
+    if (next) {
+      pausedAt = now;
+      frozenSnapshot = state.snapshot(now);
+      governor.setEnabled(false);
+    } else {
+      state.extendDeadlines(now - pausedAt);
+      frozenSnapshot = null;
+      governor.setEnabled(true);
+    }
+  };
+
   const unsubscribe = state.subscribe((event) => {
     renderer.handleEvent(event, performance.now());
-    if (event.type === 'matchEnd' && isNpc && tier) {
-      const snap = state.snapshot(performance.now());
-      recordNpcMatch(tier.id, options.roundDurationMs, event.winner, snap.roundWins);
+    if (event.type === 'matchEnd') {
+      sound.play(event.winner === 1 ? 'win' : 'loss');
+      if (isNpc && tier) {
+        const snap = state.snapshot(performance.now());
+        recordNpcMatch(tier.id, options.roundDurationMs, event.winner, snap.roundWins);
+      }
     }
     if (event.type !== 'phase') return;
     // 라운드가 새로 시작될 때 이전 라운드의 쿨다운/락아웃 잔재를 지운다
@@ -159,7 +222,14 @@ function createSession(options: MatchOptions): Session {
   const onMenu = (): void => showSetup();
   renderer.menuButton.addEventListener('click', onMenu);
 
+  const onPauseClick = (): void => setPaused(!paused, performance.now());
+  renderer.pauseButton.addEventListener('click', onPauseClick);
+
   const step = (now: number): void => {
+    if (paused) {
+      renderer.render(frozenSnapshot ?? state.snapshot(now), now, governor.stats, true);
+      return;
+    }
     if (needsReadyResync) {
       // 상태 변경 리스너 안에서 곧바로 되먹임하지 않고 다음 프레임에 처리한다
       needsReadyResync = false;
@@ -184,6 +254,7 @@ function createSession(options: MatchOptions): Session {
     stopObserving();
     governor.detach();
     renderer.menuButton.removeEventListener('click', onMenu);
+    renderer.pauseButton.removeEventListener('click', onPauseClick);
     renderer.unmount();
     needsReadyResync = false;
   };
@@ -199,6 +270,8 @@ function createSession(options: MatchOptions): Session {
     npc,
     controllable,
     setReady: (player, held) => state.setReady(player, held, performance.now()),
+    setPaused,
+    isPaused: () => paused,
     step,
     destroy,
   };
@@ -220,6 +293,7 @@ function createOnlineSession(options: MatchOptions, remote: RemoteSession): Sess
     controllable: [me],
   });
   renderer.mount();
+  renderer.setReducedMotion(currentSettings.reducedMotion);
 
   const geometry = new BoardGeometry(CONFIG, renderer.cardElements, renderer.boardElement, 'full', me);
   const governor = new InputGovernor(CONFIG, geometry, (tap) => remote.submitTap(tap));
@@ -255,6 +329,7 @@ function createOnlineSession(options: MatchOptions, remote: RemoteSession): Sess
     },
     onEvent: (event) => {
       renderer.handleEvent(event, performance.now());
+      if (event.type === 'matchEnd') sound.play(event.winner === me ? 'win' : 'loss');
       if (event.type !== 'phase') return;
       if (event.phase === 'countdown' || event.phase === 'playing') governor.resetRuntime();
       if (event.phase === 'roundEnd' || event.phase === 'matchEnd') needsReadyResync = true;
@@ -294,6 +369,10 @@ function createOnlineSession(options: MatchOptions, remote: RemoteSession): Sess
     setReady: (player, held) => {
       if (player === me) remote.setReady(held);
     },
+    setPaused: () => {
+      /* 온라인은 서버가 시간의 유일한 권위라 클라이언트 혼자 멈출 수 없다 */
+    },
+    isPaused: () => false,
     step,
     destroy,
   };
@@ -322,11 +401,12 @@ function showSetup(): void {
   session?.destroy();
   session = null;
   heldKeys.clear();
-  setup.mount(last, { onStartLocal: startGame, onStartOnline: startOnlineGame }, loadRecords());
+  setup.mount(last, { onStartLocal: startGame, onStartOnline: startOnlineGame }, loadRecords(), currentSettings, applySettings);
   exposeDebug();
 }
 
 function setReady(player: PlayerId, held: boolean): void {
+  if (session?.isPaused()) return; // 정지 중에는 준비 홀드를 놓아도 카운트다운이 취소되면 안 된다
   session?.setReady(player, held);
 }
 
@@ -365,6 +445,12 @@ window.addEventListener('keydown', (e) => {
     // 온라인은 서버가 권위라 로컬에서 재시작할 수 없다
     session.state.resetMatch(performance.now());
     session.npc?.reset();
+    session.setPaused(false, performance.now()); // 재시작했는데 정지 상태로 남지 않게
+    return;
+  }
+  if (key === 'p') {
+    // 온라인 세션은 setPaused 가 no-op 이라 아무 일도 없다
+    session.setPaused(!session.isPaused(), performance.now());
     return;
   }
   if (key !== 'f' && key !== 'j' && key !== ' ') return;
@@ -434,6 +520,10 @@ function exposeDebug(): void {
   if (debugMode === null) return;
   (window as unknown as Record<string, unknown>)['__touchFlip'] = {
     config: CONFIG,
+    sound,
+    get settings() {
+      return currentSettings;
+    },
     get session() {
       return session;
     },

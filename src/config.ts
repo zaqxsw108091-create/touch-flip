@@ -113,6 +113,8 @@ export interface UiConfig {
   RECORDS_STORAGE_KEY: string;
   /** 저장할 최고기록 최대 개수. 넘으면 순위 낮은 것부터 버린다 */
   MAX_RECORDS: number;
+  /** 음소거/모션 감소 설정을 저장하는 localStorage 키 */
+  SETTINGS_STORAGE_KEY: string;
 }
 
 export interface DebugConfig {
@@ -187,6 +189,7 @@ export const CONFIG: GameConfig = {
     OPTIONS_STORAGE_KEY: 'touch-flip:options',
     RECORDS_STORAGE_KEY: 'touch-flip:records',
     MAX_RECORDS: 20,
+    SETTINGS_STORAGE_KEY: 'touch-flip:settings',
   },
   debug: {
     allowMouse: false,

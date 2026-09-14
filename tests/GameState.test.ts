@@ -358,3 +358,68 @@ describe('GameState — 라운드 시간 선택', () => {
     expect(config.match.ROUND_DURATION_OPTIONS_MS).toContain(config.match.ROUND_DURATION_MS);
   });
 });
+
+describe('GameState — 일시정지 (extendDeadlines)', () => {
+  let config: GameConfig;
+  let state: GameState;
+
+  beforeEach(() => {
+    config = cfg();
+    state = new GameState(config);
+  });
+
+  it('카운트다운 중 정지 시간만큼 밀어도 남은 시간이 그대로 보존된다', () => {
+    state.setReady(1, true, 0);
+    state.setReady(2, true, 0);
+    const beforePause = state.remainingMs(1_000); // 카운트다운 중 1초 지난 시점의 잔여
+    state.extendDeadlines(5_000); // 5초 동안 멈춰 있었다고 알림
+    expect(state.remainingMs(1_000 + 5_000)).toBe(beforePause);
+  });
+
+  it('플레이 중 정지해도 라운드가 끝난 것으로 처리되지 않는다', () => {
+    const startAt = startRound(state, config, 0);
+    const pauseAt = startAt + 10_000;
+    const remainingAtPause = state.remainingMs(pauseAt);
+    state.extendDeadlines(20_000); // 20초 정지 — 정지 없이 그냥 뒀으면 라운드가 끝났을 시간
+    const resumeAt = pauseAt + 20_000;
+    expect(state.remainingMs(resumeAt)).toBe(remainingAtPause);
+    state.tick(resumeAt);
+    expect(state.phase).toBe('playing'); // 아직 안 끝났다
+  });
+
+  it('정지 중 놓친 탭은 재개 후 같은 시각 축에서 다시 유효하다', () => {
+    const startAt = startRound(state, config, 0);
+    const pauseAt = startAt + 100;
+    state.extendDeadlines(3_000);
+    const resumeAt = pauseAt + 3_000;
+    // 정지를 보정하지 않았다면 이 타임스탬프는 이미 지난 라운드의 것으로 거부됐을 것이다
+    const result = tap(state, 1, 0, resumeAt + 50);
+    expect(result.accepted).toBe(true);
+  });
+
+  it('활성 페널티도 함께 밀려서 남은 정지 시간이 보존된다', () => {
+    state.setReady(1, true, 0);
+    state.setReady(2, true, 0);
+    tap(state, 1, 4, 1_000); // 카운트다운 중 파울
+    const startAt = config.match.COUNTDOWN_MS;
+    state.tick(startAt);
+    const penaltyRemaining = state.penaltyUntil(1) - (startAt + 100);
+    state.extendDeadlines(4_000);
+    expect(state.penaltyUntil(1) - (startAt + 100 + 4_000)).toBe(penaltyRemaining);
+  });
+
+  it('진행 중인 마감이 없으면(idle) 아무것도 바뀌지 않는다', () => {
+    expect(state.penaltyUntil(1)).toBe(0);
+    state.extendDeadlines(9_999);
+    expect(state.penaltyUntil(1)).toBe(0); // 0이 9999가 되어 "가짜 페널티"가 생기면 안 된다
+    expect(state.phase).toBe('idle');
+  });
+
+  it('0 이하의 delta 는 아무 효과가 없다', () => {
+    const startAt = startRound(state, config, 0);
+    const before = state.remainingMs(startAt + 500);
+    state.extendDeadlines(0);
+    state.extendDeadlines(-100);
+    expect(state.remainingMs(startAt + 500)).toBe(before);
+  });
+});

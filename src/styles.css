@@ -401,6 +401,39 @@ body {
   opacity: 0.35;
 }
 
+/* ---------------------------------------------------------------- 일시정지 버튼 */
+.pause-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.pause-btn:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+.pause-btn[aria-pressed='true'] {
+  background: var(--warn);
+  border-color: var(--warn);
+  color: #1a1200;
+  font-weight: 700;
+}
+
+/* 일시정지 중에는 'playing' 페이즈라도 오버레이("일시정지" 문구)가 보여야 한다 */
+#app[data-paused='true'] .overlay {
+  opacity: 1;
+}
+
 .overlay__big {
   font-size: clamp(30px, 7vmin, 64px);
   font-weight: 900;
@@ -531,9 +564,42 @@ body {
   grid-template-columns: 1fr auto;
   grid-template-areas:
     'title back'
-    'crumbs back';
+    'tagline back'
+    'crumbs back'
+    'toggles toggles';
   align-items: center;
   gap: 2px 12px;
+}
+
+.setup__tagline {
+  grid-area: tagline;
+  margin: 0 0 2px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.setup__toggles {
+  grid-area: toggles;
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.setup__toggle {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.setup__toggle[aria-pressed='true'] {
+  border-color: var(--warn);
+  color: var(--warn);
 }
 
 .setup__title {

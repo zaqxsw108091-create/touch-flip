@@ -1,5 +1,6 @@
 import type { GameConfig } from '../config';
 import { rankRecords, type MatchRecord } from '../core/Records';
+import type { AppSettings } from '../core/Settings';
 import type { MatchOptions, OpponentKind } from '../core/types';
 import { RemoteSession } from '../net/RemoteSession';
 
@@ -26,6 +27,8 @@ export class SetupScreen {
   private options!: MatchOptions;
   private handlers!: SetupHandlers;
   private records: MatchRecord[] = [];
+  private settings: AppSettings = { mute: false, reducedMotion: false };
+  private onSettingsChange: (settings: AppSettings) => void = () => {};
   private step: Step = 'device';
   private pendingSession: RemoteSession | null = null;
 
@@ -34,11 +37,23 @@ export class SetupScreen {
     this.cfg = cfg;
   }
 
-  /** records: 싱글플레이 개인 최고기록(이 기기 안에만 저장됨). 없으면 빈 목록 */
-  mount(initial: MatchOptions, handlers: SetupHandlers, records: MatchRecord[] = []): void {
+  /**
+   * records: 싱글플레이 개인 최고기록(이 기기 안에만 저장됨). 없으면 빈 목록.
+   * settings/onSettingsChange: 음소거·모션감소. 여기서 바로 켜고 끌 수 있고,
+   * 누르는 즉시 onSettingsChange 로 알려 저장 + 실행 중인 세션에 반영한다.
+   */
+  mount(
+    initial: MatchOptions,
+    handlers: SetupHandlers,
+    records: MatchRecord[] = [],
+    settings: AppSettings = { mute: false, reducedMotion: false },
+    onSettingsChange: (settings: AppSettings) => void = () => {},
+  ): void {
     this.options = { ...initial };
     this.handlers = handlers;
     this.records = records;
+    this.settings = { ...settings };
+    this.onSettingsChange = onSettingsChange;
     this.step = 'device';
     this.root.dataset['screen'] = 'setup';
     this.render();
@@ -102,6 +117,9 @@ export class SetupScreen {
     const title = el('h1', 'setup__title');
     title.textContent = 'Touch Flip';
 
+    const tagline = el('p', 'setup__tagline');
+    tagline.textContent = '5x5 카드를 눌러 내 색으로 바꾸는 대전 — 시간이 끝나면 더 많이 가진 쪽이 승리';
+
     const crumbs = el('div', 'setup__crumbs');
     const parts: string[] = [];
     if (this.step !== 'device') parts.push(this.options.deviceMode === 'phone' ? '폰' : '태블릿');
@@ -117,7 +135,7 @@ export class SetupScreen {
     }
     crumbs.textContent = parts.join(' › ');
 
-    header.append(title, crumbs);
+    header.append(title, tagline, crumbs);
     if (this.step !== 'device') {
       const back = document.createElement('button');
       back.type = 'button';
@@ -126,7 +144,38 @@ export class SetupScreen {
       back.addEventListener('click', () => this.goBack());
       header.append(back);
     }
+    header.append(this.buildSettingsToggles());
     return header;
+  }
+
+  /** 음소거 / 모션감소. 누르는 즉시 저장 + 실행 중인 세션에도 반영된다 */
+  private buildSettingsToggles(): HTMLElement {
+    const row = el('div', 'setup__toggles');
+
+    const sound = document.createElement('button');
+    sound.type = 'button';
+    sound.className = 'setup__toggle';
+    sound.setAttribute('aria-pressed', String(this.settings.mute));
+    sound.textContent = this.settings.mute ? '🔇 소리 꺼짐' : '🔊 소리 켜짐';
+    sound.addEventListener('click', () => {
+      this.settings = { ...this.settings, mute: !this.settings.mute };
+      this.onSettingsChange({ ...this.settings });
+      this.render();
+    });
+
+    const motion = document.createElement('button');
+    motion.type = 'button';
+    motion.className = 'setup__toggle';
+    motion.setAttribute('aria-pressed', String(this.settings.reducedMotion));
+    motion.textContent = this.settings.reducedMotion ? '🧘 모션 감소' : '🎬 모션 보통';
+    motion.addEventListener('click', () => {
+      this.settings = { ...this.settings, reducedMotion: !this.settings.reducedMotion };
+      this.onSettingsChange({ ...this.settings });
+      this.render();
+    });
+
+    row.append(sound, motion);
+    return row;
   }
 
   private buildDeviceStep(): HTMLElement {

@@ -113,12 +113,26 @@ pointerdown ─▶ InputGovernor ─▶ TapEvent ─▶ GameState ─▶ Snapsho
 
 ## 배포 (GitHub Pages)
 
+`.github/workflows/deploy-pages.yml` 이 이미 준비되어 있다. `main` 브랜치에 push 하면
+빌드 + 테스트 + Pages 배포까지 자동으로 된다. 처음 한 번만 아래 3가지가 필요하다
+(계정이 필요해 AI 가 대신 할 수 없는 부분):
+
+1. GitHub 에 새 저장소 생성 (Public)
+2. `git remote add origin <저장소 URL>` 후 `git push -u origin main`
+3. 저장소 **Settings → Pages → Source** 를 "GitHub Actions" 로 설정
+
+이후 `https://<계정>.github.io/<저장소명>/` 에서 로그인 없이 바로 열린다.
+**싱글플레이(NPC)와 2인 로컬은 서버 없이 이 정적 배포만으로 완전히 동작**한다 —
+`vite.config.ts` 의 `base: './'` 덕분에 어느 서브경로에 올려도 그대로 동작한다.
+온라인 멀티만 `server/` 를 별도로 배포해야 하며(예: Render, Railway), 안 해도 나머지 모드엔 지장 없다.
+
+수동 빌드만 확인하려면:
+
 ```bash
 npm run build
+npm run preview
 ```
 
-`vite.config.ts` 의 `base: './'` 때문에 `dist/` 를 어느 서브경로에 올려도 그대로 동작한다.
-`dist/` 내용을 `gh-pages` 브랜치나 Pages 소스 디렉터리에 올리면 끝이다.
 PWA 매니페스트와 서비스 워커가 포함되어 있어 태블릿 홈화면에 추가하면 전체화면으로 실행된다.
 
 ## 문서
