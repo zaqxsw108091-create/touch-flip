@@ -442,9 +442,13 @@ export class Renderer {
       case 'matchEnd': {
         const winner = snapshot.matchWinner;
         const title = winner ? `${names[winner]} 매치 승리` : '매치 종료';
+        const r = snapshot.lastRound;
+        // 라운드 전적(2:0)만으로는 마지막 라운드가 몇 장 대 몇 장으로 갈렸는지 알 수 없다.
+        // 승부를 가른 마지막 라운드의 실제 카드 스코어를 같이 보여준다.
+        const finalScore = r ? ` · 마지막 라운드 ${r.counts[1]}:${r.counts[2]}` : '';
         this.setOverlayText(
           title,
-          `${snapshot.roundWins[1]} : ${snapshot.roundWins[2]} · 준비를 누르거나 R 로 재시작 · Esc 설정`,
+          `라운드 전적 ${snapshot.roundWins[1]}:${snapshot.roundWins[2]}${finalScore} · 준비를 누르거나 R 로 재시작 · Esc 설정`,
         );
         break;
       }
