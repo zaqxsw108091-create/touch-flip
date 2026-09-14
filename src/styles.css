@@ -1,0 +1,782 @@
+/* ---------------------------------------------------------------- 토큰 */
+:root {
+  --bg: #0b0e14;
+  --bg-soft: #141924;
+  --line: #232b3a;
+  --text: #e8ecf4;
+  --text-dim: #8e9aae;
+
+  --neutral: #2a3240;
+  --neutral-edge: #39435a;
+  --p1: #2f6fed; /* 파랑 = 플레이어 1 (아래쪽) */
+  --p1-soft: #1b4fbc;
+  --p2: #f0559b; /* 분홍 = 플레이어 2 (위쪽) */
+  --p2-soft: #c02f76;
+  --warn: #ffb020;
+
+  /* 레이아웃 예산 — HUD 두 개가 세로로 차지하는 최소 공간 */
+  --hud-reserve: 210px;
+  --edge-pad: 12px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Noto Sans KR', sans-serif;
+
+  /* 공정성/오조작 방지: 확대·선택·롱프레스 메뉴를 전부 죽인다.
+     touch-action 은 #app 에서 화면별로 정한다 (게임 = none, 설정 = 세로 스크롤 허용) */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 100dvh;
+  touch-action: none;
+}
+
+#app[data-screen='setup'] {
+  touch-action: pan-y;
+  overflow-y: auto;
+}
+
+/* ---------------------------------------------------------------- HUD */
+.hud {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px var(--edge-pad);
+  border: 1px solid transparent;
+  transition: border-color 120ms linear;
+}
+
+/* 마주 앉은 플레이어가 읽을 수 있도록 위쪽 HUD 는 뒤집는다. NPC 모드는 보는 사람이 한 명이라 안 뒤집는다 */
+#app[data-opponent='local'] .hud--p2 {
+  transform: rotate(180deg);
+}
+
+/* NPC 의 준비 버튼은 상태 표시용 */
+.ready:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.hud[data-leading='true'] {
+  border-color: var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+}
+
+.hud__info {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hud__label {
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.hud--p1 .hud__label {
+  color: #9dbcff;
+}
+
+.hud--p2 .hud__label {
+  color: #ffa8cf;
+}
+
+.hud__score {
+  font-size: 40px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.hud--p1 .hud__score {
+  color: var(--p1);
+}
+
+.hud--p2 .hud__score {
+  color: var(--p2);
+}
+
+.hud__pips {
+  font-size: 16px;
+  letter-spacing: 3px;
+  color: var(--text-dim);
+}
+
+.hud__center {
+  text-align: center;
+}
+
+.hud__timer {
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.hud__foul {
+  display: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--warn);
+}
+
+.hud[data-foul='true'] .hud__foul {
+  display: block;
+}
+
+.hud[data-foul='true'] .hud__timer {
+  color: var(--warn);
+}
+
+/* ---------------------------------------------------------------- 준비 버튼 */
+.ready {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 116px;
+  padding: 12px 18px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  font-size: 17px;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.ready:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.ready__key {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.hud--p1 .ready[data-held='true'] {
+  background: var(--p1);
+  border-color: #9dbcff;
+}
+
+.hud--p2 .ready[data-held='true'] {
+  background: var(--p2);
+  border-color: #ffa8cf;
+}
+
+.ready[data-held='true'] .ready__key {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ---------------------------------------------------------------- 보드 */
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+
+.board {
+  /* 카드 크기는 물리 크기 고정이 원칙이고, 화면이 모자랄 때만 줄어든다.
+     화면이 커져도 절대 커지지 않는다 — 손 이동 거리가 늘면 오히려 불리해지므로. */
+  --gap: var(--gap-mm);
+  --fit-w: calc((100vw - var(--edge-pad) * 2 - (var(--cols) - 1) * var(--gap)) / var(--cols));
+  --fit-h: calc(
+    (100dvh - var(--hud-reserve) - (var(--rows) - 1) * var(--gap)) / var(--rows)
+  );
+  --card: min(var(--card-mm), var(--fit-w), var(--fit-h));
+
+  display: grid;
+  grid-template-columns: repeat(var(--cols), var(--card));
+  grid-template-rows: repeat(var(--rows), var(--card));
+  gap: var(--gap);
+  padding: var(--gap);
+  border-radius: 16px;
+  background: #0f131c;
+  border: 1px solid var(--line);
+  touch-action: none;
+}
+
+.card {
+  position: relative;
+  width: var(--card);
+  height: var(--card);
+  border-radius: 14%;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* 카드 내부 요소는 전부 히트 테스트 대상이 아니다.
+   판정은 BoardGeometry 의 사각형 캐시가 담당한다. */
+.card > * {
+  pointer-events: none;
+}
+
+.card__face {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--neutral);
+  box-shadow: inset 0 0 0 1px var(--neutral-edge);
+  transition: background-color 90ms linear;
+}
+
+/* 색약 대응: 색상 외에 패턴으로도 소유자를 구분한다 (P1 사선 / P2 점) */
+.card[data-owner='1'] .card__face {
+  background-color: var(--p1);
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.34) 0 3px,
+    rgba(255, 255, 255, 0) 3px 9px
+  );
+  box-shadow: inset 0 0 0 2px var(--p1-soft);
+}
+
+.card[data-owner='2'] .card__face {
+  background-color: var(--p2);
+  background-image: radial-gradient(circle at 3px 3px, rgba(255, 255, 255, 0.55) 1.7px, transparent 2px);
+  background-size: 9px 9px;
+  box-shadow: inset 0 0 0 2px var(--p2-soft);
+}
+
+/* 존 힌트 — 어느 쪽 절반이 누구 것인지 시각적으로 알려준다 */
+.card__zone {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc((100% - var(--band-ratio) * 100%) / 2);
+}
+
+.card__zone--p2 {
+  top: 0;
+  border-top: 3px solid rgba(240, 85, 155, 0.5);
+  border-radius: 14% 14% 0 0;
+}
+
+.card__zone--p1 {
+  bottom: 0;
+  border-bottom: 3px solid rgba(47, 111, 237, 0.5);
+  border-radius: 0 0 14% 14%;
+}
+
+/* NPC 모드('full' 존): 카드 전체가 사람 영역이므로 분할 표시를 없앤다 */
+#app[data-zone='full'] .card__zone,
+#app[data-zone='full'] .card__band {
+  display: none;
+}
+
+/* 중립 띠 — 여기를 누르면 무효 */
+.card__band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - var(--band-ratio) * 50%);
+  height: calc(var(--band-ratio) * 100%);
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* ---------------------------------------------------------------- 타이머 바 */
+.timerbar {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.timerbar::before,
+.timerbar::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  width: calc(var(--p) * min(92vw, 560px));
+  height: 6px;
+  border-radius: 3px;
+  background: var(--text-dim);
+  transition: background-color 150ms linear;
+}
+
+.timerbar::before {
+  top: 6px;
+}
+
+.timerbar::after {
+  bottom: 6px;
+}
+
+.timerbar[data-warn='true']::before,
+.timerbar[data-warn='true']::after {
+  background: var(--warn);
+}
+
+/* ---------------------------------------------------------------- 오버레이 */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  place-items: center;
+  pointer-events: none;
+  transition: opacity 120ms linear;
+}
+
+.overlay[data-phase='playing'] {
+  opacity: 0;
+}
+
+.overlay__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  text-align: center;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.95);
+}
+
+.overlay__panel--flipped {
+  transform: rotate(180deg);
+}
+
+#app[data-opponent='npc'] .overlay {
+  grid-template-rows: 1fr;
+}
+
+#app[data-opponent='npc'] .overlay__panel--flipped {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- 설정으로 버튼 */
+.menu-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.menu-btn:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+#app[data-phase='playing'] .menu-btn {
+  opacity: 0.35;
+}
+
+.overlay__big {
+  font-size: clamp(30px, 7vmin, 64px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.overlay__sub {
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.92;
+  max-width: 60vw;
+}
+
+.overlay[data-phase='countdown'] .overlay__big {
+  font-size: clamp(56px, 16vmin, 140px);
+  color: var(--warn);
+}
+
+/* ---------------------------------------------------------------- 디버그 통계 */
+.stats {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border-top: 1px solid var(--line);
+  background: #000;
+  color: #7fe3a1;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+/* ---------------------------------------------------------------- 좁은 화면 */
+@media (max-height: 700px) {
+  :root {
+    --hud-reserve: 170px;
+  }
+
+  .hud__score {
+    font-size: 30px;
+  }
+
+  .ready {
+    min-width: 96px;
+    padding: 9px 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card__face {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------- 폰 모드 */
+#app[data-device='phone'] {
+  --hud-reserve: 150px;
+  --edge-pad: 8px;
+}
+
+#app[data-device='phone'] .hud {
+  padding: 6px var(--edge-pad);
+  gap: 8px;
+}
+
+#app[data-device='phone'] .hud__label {
+  font-size: 11px;
+}
+
+#app[data-device='phone'] .hud__score {
+  font-size: 28px;
+}
+
+#app[data-device='phone'] .hud__pips {
+  font-size: 13px;
+  letter-spacing: 2px;
+}
+
+#app[data-device='phone'] .hud__timer {
+  font-size: 20px;
+}
+
+#app[data-device='phone'] .ready {
+  min-width: 84px;
+  padding: 8px 12px;
+  font-size: 15px;
+}
+
+#app[data-device='phone'] .overlay__sub {
+  font-size: 12px;
+  max-width: 80vw;
+}
+
+/* ---------------------------------------------------------------- 연결 상태 배너 */
+.banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  translate: -50% 0;
+  max-width: min(92vw, 520px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(20, 25, 36, 0.92);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.banner[data-tone='warn'] {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+/* ---------------------------------------------------------------- 시작 설정 마법사 */
+.setup {
+  width: min(100%, 600px);
+  margin: 0 auto;
+  padding: 20px var(--edge-pad) 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.setup__header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'title back'
+    'crumbs back';
+  align-items: center;
+  gap: 2px 12px;
+}
+
+.setup__title {
+  grid-area: title;
+  margin: 0;
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  background: linear-gradient(90deg, var(--p1), var(--p2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.setup__crumbs {
+  grid-area: crumbs;
+  min-height: 18px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.setup__back {
+  grid-area: back;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.setup__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setup__question {
+  margin: 4px 0 2px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.setup__choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 16px 18px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.setup__choice[aria-pressed='true'] {
+  border-color: var(--p1);
+  background: rgba(47, 111, 237, 0.14);
+}
+
+.setup__choice-label {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.setup__choice-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.setup__times {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.setup__time {
+  padding: 14px 8px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.setup__time[aria-pressed='true'] {
+  border-color: var(--p1);
+  background: rgba(47, 111, 237, 0.18);
+}
+
+.setup__start {
+  padding: 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--p1);
+  color: #fff;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.setup__start--secondary {
+  background: var(--bg-soft);
+  border: 2px solid var(--line);
+  color: var(--text);
+  font-size: 16px;
+  padding: 12px;
+}
+
+.setup__choice:focus-visible,
+.setup__time:focus-visible,
+.setup__start:focus-visible,
+.setup__back:focus-visible,
+.setup__input:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+.setup__hint {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.setup__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.setup__input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.setup__input--code {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 8px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.setup__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-soft);
+}
+
+.setup__card h3 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-dim);
+}
+
+.setup__status {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 176, 32, 0.12);
+  color: var(--warn);
+  font-size: 13px;
+}
+
+.setup__status[data-error='false'] {
+  background: rgba(47, 111, 237, 0.12);
+  color: #9dbcff;
+}
+
+.lobby {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-soft);
+  text-align: center;
+}
+
+.lobby__code {
+  font-size: 56px;
+  font-weight: 900;
+  letter-spacing: 10px;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.lobby__text {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+/* ---------------------------------------------------------------- 개인 최고기록 (싱글플레이, 이 기기 안에만 저장) */
+.setup__records {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-soft);
+}
+
+.setup__records-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.setup__records-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}

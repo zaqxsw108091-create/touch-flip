@@ -1,0 +1,20 @@
+{
+  "name": "touch-flip",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "터치 기반 2인 대전 카드 뒤집기 게임",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "icons": "node scripts/gen-icons.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.4"
+  }
+}

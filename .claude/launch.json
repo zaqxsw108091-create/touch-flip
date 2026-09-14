@@ -1,0 +1,32 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "touch-flip",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "touch-flip-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "preview"
+      ],
+      "port": 4173
+    },
+    {
+      "name": "touch-flip-server",
+      "runtimeExecutable": "./gradlew",
+      "runtimeArgs": [
+        "bootRun"
+      ],
+      "cwd": "server",
+      "port": 8080
+    }
+  ]
+}
