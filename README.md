@@ -135,6 +135,13 @@ npm run preview
 
 PWA 매니페스트와 서비스 워커가 포함되어 있어 태블릿 홈화면에 추가하면 전체화면으로 실행된다.
 
+## 스크린샷
+
+싱글플레이(NPC) 대전 화면. `docs/screenshots/` 에 이미지를 넣고 파일명만 아래에 맞추면 표시된다.
+
+![라운드 진행 중](docs/screenshots/gameplay-round.png)
+![매치 결과](docs/screenshots/gameplay-result.png)
+
 ## 문서
 
 - [docs/GAME_SPEC.md](docs/GAME_SPEC.md) — 게임 규칙, 입력 공정성 상수, 네트워크 프로토콜
