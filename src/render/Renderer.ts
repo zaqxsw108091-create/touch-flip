@@ -167,6 +167,7 @@ export class Renderer {
     if (snapshot.phase === 'countdown' && snapshot.countdownValue !== this.prevCountdownValue) {
       this.prevCountdownValue = snapshot.countdownValue;
       this.setOverlayText(String(snapshot.countdownValue), '보드를 건드리면 부정 출발입니다');
+      this.pulseCountdownNumber();
     }
 
     if (stats && this.statsEl) this.renderStats(stats);
@@ -391,9 +392,11 @@ export class Renderer {
       this.timerEls[2].textContent = text;
     }
     this.timerBarEl.style.setProperty('--p', String(total > 0 ? remaining / total : 0));
-    this.timerBarEl.dataset['warn'] = String(
-      snapshot.phase === 'playing' && remaining <= this.cfg.ui.TIMER_WARN_MS,
-    );
+    const warn = snapshot.phase === 'playing' && remaining <= this.cfg.ui.TIMER_WARN_MS;
+    this.timerBarEl.dataset['warn'] = String(warn);
+    // 시간이 얼마 안 남았을 때 보드 테두리도 같이 맥동시켜 "카드를 읽는 시야" 밖에서도
+    // 시간 압박이 느껴지게 한다 — 카드 자체는 안 건드리므로 판단에 방해되지 않는다.
+    this.boardEl.dataset['warn'] = String(warn);
   }
 
   private renderFoulFlash(now: number): void {
@@ -479,6 +482,21 @@ export class Renderer {
   /** 앱 설정(모션 감소) 또는 OS 설정(prefers-reduced-motion) 중 하나라도 켜져 있으면 애니메이션을 끈다 */
   setReducedMotion(reduced: boolean): void {
     this.reducedMotion = reduced;
+  }
+
+  private pulseCountdownNumber(): void {
+    if (this.reducedMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    for (const panel of this.overlayPanels) {
+      const big = panel.querySelector<HTMLElement>('.overlay__big');
+      if (!big) continue;
+      big.animate(
+        [
+          { transform: 'scale(1.4)', opacity: 0.6 },
+          { transform: 'scale(1)', opacity: 1 },
+        ],
+        { duration: 220, easing: 'ease-out' },
+      );
+    }
   }
 
   private playFlip(card: HTMLElement): void {

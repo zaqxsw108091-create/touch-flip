@@ -226,6 +226,7 @@ function createSession(options: MatchOptions): Session {
 
   const unsubscribe = state.subscribe((event) => {
     renderer.handleEvent(event, performance.now());
+    if (event.type === 'foul') sound.playFoul();
     if (event.type === 'matchEnd') {
       sound.play(event.winner === 1 ? 'win' : 'loss');
       if (isNpc && tier) {
@@ -234,6 +235,7 @@ function createSession(options: MatchOptions): Session {
       }
     }
     if (event.type !== 'phase') return;
+    if (event.phase === 'playing' && event.previous === 'countdown') sound.playCountdownGo();
     // 라운드가 새로 시작될 때 이전 라운드의 쿨다운/락아웃 잔재를 지운다
     if (event.phase === 'countdown' || event.phase === 'playing') governor.resetRuntime();
     if (event.phase === 'roundEnd' || event.phase === 'matchEnd') needsReadyResync = true;
@@ -244,6 +246,9 @@ function createSession(options: MatchOptions): Session {
 
   const onPauseClick = (): void => setPaused(!paused, performance.now());
   renderer.pauseButton.addEventListener('click', onPauseClick);
+
+  // 3·2·1 은 discrete 이벤트가 없다 — 화면에 보이는 숫자가 바뀌는 순간을 직접 감지해 한 번만 울린다
+  let prevCountdownTick = 0;
 
   const step = (now: number): void => {
     if (paused) {
@@ -266,7 +271,17 @@ function createSession(options: MatchOptions): Session {
       }
     }
 
-    renderer.render(state.snapshot(now), now, governor.stats);
+    const snap = state.snapshot(now);
+    if (snap.phase === 'countdown') {
+      if (snap.countdownValue !== prevCountdownTick) {
+        prevCountdownTick = snap.countdownValue;
+        sound.playCountdownTick();
+      }
+    } else if (prevCountdownTick !== 0) {
+      prevCountdownTick = 0;
+    }
+
+    renderer.render(snap, now, governor.stats);
   };
 
   const destroy = (): void => {
@@ -350,8 +365,10 @@ function createOnlineSession(options: MatchOptions, remote: RemoteSession): Sess
     },
     onEvent: (event) => {
       renderer.handleEvent(event, performance.now());
+      if (event.type === 'foul') sound.playFoul();
       if (event.type === 'matchEnd') sound.play(event.winner === me ? 'win' : 'loss');
       if (event.type !== 'phase') return;
+      if (event.phase === 'playing' && event.previous === 'countdown') sound.playCountdownGo();
       if (event.phase === 'countdown' || event.phase === 'playing') governor.resetRuntime();
       if (event.phase === 'roundEnd' || event.phase === 'matchEnd') needsReadyResync = true;
     },
@@ -360,13 +377,25 @@ function createOnlineSession(options: MatchOptions, remote: RemoteSession): Sess
   const onMenu = (): void => showSetup();
   renderer.menuButton.addEventListener('click', onMenu);
 
+  // 3·2·1 은 discrete 이벤트가 없다 — 화면에 보이는 숫자가 바뀌는 순간을 직접 감지해 한 번만 울린다
+  let prevCountdownTick = 0;
+
   const step = (now: number): void => {
     if (needsReadyResync) {
       needsReadyResync = false;
       governor.resyncReady();
       applyHeldKeys();
     }
-    renderer.render(remote.snapshot(now), now, governor.stats);
+    const snap = remote.snapshot(now);
+    if (snap.phase === 'countdown') {
+      if (snap.countdownValue !== prevCountdownTick) {
+        prevCountdownTick = snap.countdownValue;
+        sound.playCountdownTick();
+      }
+    } else if (prevCountdownTick !== 0) {
+      prevCountdownTick = 0;
+    }
+    renderer.render(snap, now, governor.stats);
   };
 
   const destroy = (): void => {

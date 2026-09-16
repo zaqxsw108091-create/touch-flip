@@ -339,6 +339,17 @@ body {
   background: var(--warn);
 }
 
+/* 시간이 얼마 안 남았을 때 보드 테두리를 맥동시켜 타이머 바 밖에서도 시간 압박이 느껴지게 한다.
+   카드 자체는 건드리지 않으므로 판단에 방해되지 않는다. */
+@keyframes board-warn-pulse {
+  0%, 100% { border-color: var(--line); box-shadow: none; }
+  50% { border-color: var(--warn); box-shadow: 0 0 0 2px rgba(255, 176, 32, 0.35); }
+}
+
+.board[data-warn='true'] {
+  animation: board-warn-pulse 1s ease-in-out infinite;
+}
+
 /* ---------------------------------------------------------------- 오버레이 */
 .overlay {
   position: absolute;
@@ -484,6 +495,11 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .card__face {
     transition: none;
+  }
+
+  .board[data-warn='true'] {
+    animation: none;
+    border-color: var(--warn);
   }
 }
 
