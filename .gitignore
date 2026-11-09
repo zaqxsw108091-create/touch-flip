@@ -3,3 +3,8 @@ dist/
 server/build/
 server/.gradle/
 .DS_Store
+
+# 개인 작업 메모·로컬 도구 설정 (공개하지 않음)
+CLAUDE.md
+AGENTS.md
+.claude/
