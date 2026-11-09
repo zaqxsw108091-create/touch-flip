@@ -186,7 +186,7 @@ export const CONFIG: GameConfig = {
     RETRY_INTERVAL_MS: 700,
     DEFAULT_PORT: 8080,
     DEFAULT_PATH: '/ws',
-    NO_SERVER_HOST_SUFFIXES: ['github.io'],
+    NO_SERVER_HOST_SUFFIXES: ['github.io', 'netlify.app', 'vercel.app', 'pages.dev', 'itch.io', 'itch.zone'],
   },
   ui: {
     FLIP_ANIM_MS: 170,

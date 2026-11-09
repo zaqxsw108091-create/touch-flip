@@ -219,7 +219,7 @@ export class SetupScreen {
         this.go('time');
       }),
       this.choice('온라인 멀티', isNoServerHost(this.cfg)
-        ? '기기 2대, 방 코드로 연결 — 이 공개 링크에는 서버가 없어 지금은 쓸 수 없어요'
+        ? '기기 2대, 방 코드로 연결 — 공개 링크에서는 아직 불가 · 차후 업데이트 예정'
         : '기기 2대, 방 코드로 연결 (같은 Wi-Fi 권장)', () => {
         this.options.opponent = 'online';
         this.go('online');
@@ -289,7 +289,7 @@ export class SetupScreen {
       const notice = el('p', 'setup__status');
       notice.dataset.error = 'true';
       notice.textContent =
-        '이 공개 링크에는 온라인 대전용 서버가 없어서, 지금은 온라인 멀티를 할 수 없어요. ' +
+        '온라인 멀티는 아직 서버가 없어 공개 링크에서는 할 수 없어요(차후 업데이트 예정). ' +
         '싱글플레이(NPC)나 2인 로컬(한 화면)로 즐겨 주세요. 직접 서버를 켰다면 아래에 그 주소를 넣어 연결할 수 있어요.';
       section.append(notice);
     }
