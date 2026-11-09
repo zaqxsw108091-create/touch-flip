@@ -218,7 +218,9 @@ export class SetupScreen {
         this.options.opponent = 'local';
         this.go('time');
       }),
-      this.choice('온라인 멀티', '기기 2대, 방 코드로 연결 (같은 Wi-Fi 권장)', () => {
+      this.choice('온라인 멀티', isNoServerHost(this.cfg)
+        ? '기기 2대, 방 코드로 연결 — 이 공개 링크에는 서버가 없어 지금은 쓸 수 없어요'
+        : '기기 2대, 방 코드로 연결 (같은 Wi-Fi 권장)', () => {
         this.options.opponent = 'online';
         this.go('online');
       }),
@@ -282,6 +284,15 @@ export class SetupScreen {
 
   private buildOnlineStep(): HTMLElement {
     const section = this.section('온라인 멀티');
+
+    if (isNoServerHost(this.cfg)) {
+      const notice = el('p', 'setup__status');
+      notice.dataset.error = 'true';
+      notice.textContent =
+        '이 공개 링크에는 온라인 대전용 서버가 없어서, 지금은 온라인 멀티를 할 수 없어요. ' +
+        '싱글플레이(NPC)나 2인 로컬(한 화면)로 즐겨 주세요. 직접 서버를 켰다면 아래에 그 주소를 넣어 연결할 수 있어요.';
+      section.append(notice);
+    }
 
     const urlLabel = el('label', 'setup__field');
     urlLabel.textContent = '서버 주소';
@@ -506,6 +517,12 @@ function opponentLabel(kind: OpponentKind): string {
     default:
       return '';
   }
+}
+
+/** 게임 서버 없이 정적 파일만 올라가는 공개 주소(GitHub Pages 등)에서 열렸는지 */
+export function isNoServerHost(cfg: GameConfig): boolean {
+  const host = location.hostname;
+  return cfg.online.NO_SERVER_HOST_SUFFIXES.some((s) => host === s || host.endsWith(`.${s}`));
 }
 
 export function defaultServerUrl(cfg: GameConfig): string {

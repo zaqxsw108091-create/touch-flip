@@ -98,6 +98,8 @@ export interface OnlineConfig {
   /** 서버 주소를 입력하지 않았을 때: <현재 호스트>:<포트><경로> */
   DEFAULT_PORT: number;
   DEFAULT_PATH: string;
+  /** 정적 파일만 올라가는(게임 서버가 없는) 공개 호스트. 여기서 열리면 온라인 멀티가 지금은 안 된다고 안내한다 */
+  NO_SERVER_HOST_SUFFIXES: string[];
 }
 
 export interface UiConfig {
@@ -184,6 +186,7 @@ export const CONFIG: GameConfig = {
     RETRY_INTERVAL_MS: 700,
     DEFAULT_PORT: 8080,
     DEFAULT_PATH: '/ws',
+    NO_SERVER_HOST_SUFFIXES: ['github.io'],
   },
   ui: {
     FLIP_ANIM_MS: 170,
