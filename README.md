@@ -1,9 +1,16 @@
 # Touch Flip
 
-한 화면에서 마주 앉아 하는 **2인 터치 카드 뒤집기 대전**.
-5x5 = 25장의 카드를 더 많이 자기 색으로 뒤집는 쪽이 이긴다.
+5x5 = 25장의 카드를 **더 빨리 내 색으로 뒤집는** 터치 카드 뒤집기 대전.
 
 > 설계 원칙: **기기 성능 차이가 승부에 영향을 주면 안 된다. 오직 손가락 속도만이 결과를 결정한다.**
+
+## 바로 플레이
+
+**https://zaqxsw108091-create.github.io/touch-flip/** — 로그인·설치 없이 열립니다.
+
+- 혼자 해보려면: 기기 **컴퓨터**(마우스) 또는 태블릿/폰(터치) → **싱글플레이** → NPC 단계 선택
+- 기기 2대 온라인 대전은 별도 서버가 필요해 공개 데모에서는 동작하지 않습니다 (로컬 실행 방법은 아래)
+- 의견·버그는 [Issues](https://github.com/zaqxsw108091-create/touch-flip/issues) 에 남겨 주세요
 
 ## 빠른 시작
 
@@ -25,7 +32,7 @@ cd server && ./gradlew bootRun
 | 명령 | 설명 |
 |---|---|
 | `npm run dev` | 개발 서버 (`--host` 포함) |
-| `npm run test` | 유닛 테스트 75개 |
+| `npm run test` | 유닛 테스트 110개 |
 | `npm run build` | 타입 검사(strict) + 프로덕션 번들 |
 | `npm run preview` | 빌드 결과 확인 |
 | `npm run icons` | PWA 아이콘 PNG 재생성 (public/ 에 커밋되어 있어 평소엔 불필요) |
@@ -113,18 +120,9 @@ pointerdown ─▶ InputGovernor ─▶ TapEvent ─▶ GameState ─▶ Snapsho
 
 ## 배포 (GitHub Pages)
 
-`.github/workflows/deploy-pages.yml` 이 이미 준비되어 있다. `main` 브랜치에 push 하면
-빌드 + 테스트 + Pages 배포까지 자동으로 된다. 처음 한 번만 아래 3가지가 필요하다
-(계정이 필요해 AI 가 대신 할 수 없는 부분):
-
-1. GitHub 에 새 저장소 생성 (Public)
-2. `git remote add origin <저장소 URL>` 후 `git push -u origin main`
-3. 저장소 **Settings → Pages → Source** 를 "GitHub Actions" 로 설정
-
-이후 `https://<계정>.github.io/<저장소명>/` 에서 로그인 없이 바로 열린다.
-**싱글플레이(NPC)와 2인 로컬은 서버 없이 이 정적 배포만으로 완전히 동작**한다 —
-`vite.config.ts` 의 `base: './'` 덕분에 어느 서브경로에 올려도 그대로 동작한다.
-온라인 멀티만 `server/` 를 별도로 배포해야 하며(예: Render, Railway), 안 해도 나머지 모드엔 지장 없다.
+`main` 에 push 하면 `.github/workflows/deploy-pages.yml` 이 빌드 + 테스트 + Pages 배포를 자동으로 한다.
+싱글플레이(NPC)와 2인 로컬은 서버 없이 이 정적 배포만으로 동작한다 (`vite.config.ts` 의 `base: './'`).
+온라인 멀티만 `server/` 를 별도로 배포해야 한다.
 
 수동 빌드만 확인하려면:
 
@@ -136,8 +134,6 @@ npm run preview
 PWA 매니페스트와 서비스 워커가 포함되어 있어 태블릿 홈화면에 추가하면 전체화면으로 실행된다.
 
 ## 스크린샷
-
-싱글플레이(NPC) 대전 화면. `docs/screenshots/` 에 이미지를 넣고 파일명만 아래에 맞추면 표시된다.
 
 ![NPC 대전 화면 1](docs/screenshots/gameplay-npc1.png)
 ![NPC 대전 화면 2](docs/screenshots/gameplay-npc2.png)

@@ -181,11 +181,11 @@ export class SetupScreen {
   private buildDeviceStep(): HTMLElement {
     const section = this.section('어떤 기기로 하나요?');
     section.append(
-      this.choice('태블릿', `카드 ${this.cfg.device.tablet.CARD_PHYSICAL_SIZE_MM}mm · 마주 앉아 2인 대전에 적합`, () => {
+      this.choice('태블릿', `카드 ${this.cfg.device.tablet.CARD_PHYSICAL_SIZE_MM}mm · 터치스크린 필요 · 마주 앉아 2인 대전에 적합`, () => {
         this.options.deviceMode = 'tablet';
         this.go('mode');
       }),
-      this.choice('폰', `카드 ${this.cfg.device.phone.CARD_PHYSICAL_SIZE_MM}mm · 한 손 화면, 싱글·온라인에 적합`, () => {
+      this.choice('폰', `카드 ${this.cfg.device.phone.CARD_PHYSICAL_SIZE_MM}mm · 터치스크린 필요 · 한 손 화면, 싱글·온라인에 적합`, () => {
         this.options.deviceMode = 'phone';
         this.go('mode');
       }),
