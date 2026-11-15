@@ -22,6 +22,17 @@
   <body>
     <div id="app"></div>
     <noscript>이 게임을 하려면 JavaScript 를 켜야 합니다.</noscript>
+    <script>
+      // index.html 을 더블클릭(file://)으로 열면 module 스크립트가 실행되지 않아 흰 화면만 나온다.
+      if (location.protocol === "file:") {
+        document.getElementById("app").innerHTML =
+          '<div style="font-family:sans-serif;max-width:480px;margin:10vh auto;padding:0 20px;line-height:1.6">' +
+          "<h2>index.html 을 직접 열면 실행되지 않습니다</h2>" +
+          '<p>바로 플레이: <a href="https://zaqxsw108091-create.github.io/touch-flip/">https://zaqxsw108091-create.github.io/touch-flip/</a></p>' +
+          "<p>내 PC에서 실행: 터미널에서 <code>npm install</code> → <code>npm run dev</code> 후 " +
+          "표시되는 <code>http://localhost:5173/</code> 주소로 접속하세요.</p></div>";
+      }
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -14,6 +14,10 @@
 
 ## 빠른 시작
 
+> ⚠️ `index.html` 을 더블클릭해서 열면 **흰 화면만 나옵니다** (Vite + TypeScript 프로젝트라 개발 서버가 필요).
+> 아래 명령으로 실행한 뒤 터미널에 표시되는 `http://localhost:5173/` 주소로 접속하거나, 위 "바로 플레이" 링크를 사용하세요.
+> (Node.js LTS 설치 필요: https://nodejs.org)
+
 ```bash
 npm install
 npm run dev
